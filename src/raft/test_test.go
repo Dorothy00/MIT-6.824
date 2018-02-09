@@ -312,12 +312,10 @@ func TestRejoin2B(t *testing.T) {
 	cfg.connect(leader1)
 
 	cfg.one(104, 2)
-
 	// all together now
 	cfg.connect(leader2)
 
 	cfg.one(105, servers)
-
 	fmt.Printf("  ... Passed\n")
 }
 
@@ -375,6 +373,7 @@ func TestBackup2B(t *testing.T) {
 	for i := 0; i < servers; i++ {
 		cfg.disconnect(i)
 	}
+
 	cfg.connect((leader1 + 0) % servers)
 	cfg.connect((leader1 + 1) % servers)
 	cfg.connect(other)
