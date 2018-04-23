@@ -410,7 +410,6 @@ func (cfg *config) one(cmd int, expectedServers int) int {
 		}
 
 		if index != -1 {
-    //fmt.Printf("start index is %d\n", index)
 			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.
 			t1 := time.Now()

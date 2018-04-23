@@ -642,7 +642,6 @@ func TestFigure82C(t *testing.T) {
 	fmt.Printf("Test (2C): Figure 8 ...\n")
 
 	cfg.one(rand.Int(), 1)
-
 	nup := servers
 	for iters := 0; iters < 1000; iters++ {
 		leader := -1
@@ -662,7 +661,6 @@ func TestFigure82C(t *testing.T) {
 			ms := (rand.Int63() % 13)
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		}
-
 		if leader != -1 {
 			cfg.crash1(leader)
 			nup -= 1
@@ -684,9 +682,7 @@ func TestFigure82C(t *testing.T) {
 			cfg.connect(i)
 		}
 	}
-
 	cfg.one(rand.Int(), servers)
-
 	fmt.Printf("  ... Passed\n")
 }
 
