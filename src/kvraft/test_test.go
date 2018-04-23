@@ -423,7 +423,7 @@ func GenericTestLinearizability(t *testing.T, part string, nclients int, nserver
 	}
 }
 
-/*func TestBasic3A(t *testing.T) {
+func TestBasic3A(t *testing.T) {
 	// Test: one client (3A) ...
 	GenericTest(t, "3A", 1, false, false, false, -1)
 }
@@ -431,7 +431,7 @@ func GenericTestLinearizability(t *testing.T, part string, nclients int, nserver
 func TestConcurrent3A(t *testing.T) {
 	// Test: many clients (3A) ...
 	GenericTest(t, "3A", 5, false, false, false, -1)
-}*/
+}
 
 func TestUnreliable3A(t *testing.T) {
 	// Test: unreliable net, many clients (3A) ...

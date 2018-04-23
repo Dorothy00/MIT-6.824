@@ -137,13 +137,13 @@ func (rf *Raft) readPersist(data []byte) {
 }
 
 func (rf *Raft) snapShot(data []byte, lastIncludeIndex int, lastIncludeTerm int){
-  w := new(byte.Buffer)
+  w := new(bytes.Buffer)
   e := gob.NewEncoder(w)
   e.Encode(lastIncludeIndex)
   e.Encode(lastIncludeTerm)
   e.Encode(data)
   d := w.Bytes()
-  rf.persister.SaveSnapShot(d)
+  rf.persister.SaveSnapshot(d)
 }
 
 
@@ -291,7 +291,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	    rf.voteNum++;
 	    if 2 * rf.voteNum > len(rf.peers){
 	      rf.state = LEADER
-	      DPrintf("Leader: %d-------\n", rf.me)
 	      rf.electCh <- true
 	    }
 	  }
@@ -477,7 +476,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	  rf.persist()
 	  rf.mu.Unlock()
 	}
-  DPrintf("Raft: Start---%t\n", isLeader)
 	return index, term, isLeader
 }
 
@@ -534,7 +532,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 	rf.persist()
-	DPrintf("make----%d-----\n", me)
 
 	 go rf.run()
 	 go rf.commitLogs()
@@ -550,7 +547,6 @@ func (rf *Raft) run(){
     //rf.mu.Unlock()
     switch currState{
       case LEADER:
-          DPrintf("Raft %d send hear beat--------\n", rf.me)
           rf.sendHeartBeatBroadcast()
           time.Sleep(time.Millisecond * time.Duration(HEARTBEATINTERVAL))
       case CANDIDATE:
@@ -564,9 +560,7 @@ func (rf *Raft) run(){
         rf.sendRequestVoteBroadcast()
         select{
           case <-rf.heartCh:
-          DPrintf("Raft %d receive heartCh candidate--------\n", rf.me)
           case <-rf.electCh:
-          DPrintf("Raft %d win elect--------\n", rf.me)
             rf.mu.Lock()
             rf.state = LEADER
             rf.nextIndex = make([]int, len(rf.peers))
@@ -576,7 +570,6 @@ func (rf *Raft) run(){
             rf.matchIndex = make([]int, len(rf.peers))
             rf.mu.Unlock()
           case <- time.After(time.Millisecond * time.Duration(ELECTIONTIMEOUT + rand.Intn(200))):
-            DPrintf("Raft %d timeout candidate--------\n", rf.me)
         }
       case FOLLOWER:
         select{
