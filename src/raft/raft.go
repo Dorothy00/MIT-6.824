@@ -49,6 +49,7 @@ const(
   ELECTIONTIMEOUT = 300
   HEARTBEATINTERVAL = 120
 )
+
 //
 // A Go object implementing a single Raft peer.
 //
@@ -289,7 +290,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	  }
 	  if reply.Granted{
 	    rf.voteNum++;
-	    if 2 * rf.voteNum > len(rf.peers){
+	    if 2 * rf.voteNum > len(rf.peers) && rf.state != LEADER{
 	      rf.state = LEADER
 	      rf.electCh <- true
 	    }
@@ -317,16 +318,15 @@ func (rf *Raft) sendRequestVoteBroadcast(){
 
 func (rf *Raft) AppendEntries(args *AppendEntries, reply *AppendEntriesReply) {
  defer rf.persist()
- DPrintf("AppendEntries: args.Term = %d, rf.CurrentTerm = %d\n", args.Term, rf.CurrentTerm)
  if args.Term < rf.CurrentTerm{
     reply.Term = rf.CurrentTerm
     reply.Success = false
     return
  }
   rf.CurrentTerm = args.Term
+  rf.state = FOLLOWER
   reply.Term = rf.CurrentTerm
   reply.Success = false
-  DPrintf("AppendEntries: args.PrevLogIndex = %d, raft %d's lastLogIndex = %d\n", args.PrevLogIndex, rf.me, rf.getLastLogIndex())
   if args.PrevLogIndex > rf.getLastLogIndex() {
     reply.NextTryIndex = rf.getLastLogIndex() + 1
     return
@@ -342,22 +342,17 @@ func (rf *Raft) AppendEntries(args *AppendEntries, reply *AppendEntriesReply) {
     return
   }
 
-  DPrintf("AppendEntries: raft %d receive %d entries\n", rf.me, len(args.Entries))
   rf.Log = append(rf.Log[:args.PrevLogIndex + 1], args.Entries...)
-  DPrintf("AppendEntries: after append raft %d's log len is %d\n", rf.me, len(rf.Log))
   reply.Success = true
   select{
     case rf.heartCh <- true:
-      DPrintf("AppendEntries: raft %d heartch\n", rf.me)
   }
 
-  DPrintf("AppendEntres: Leader commit is %d, %d's commitIndex is: %d\n", args.LeaderCommit, rf.me, rf.commitIndex)
   if args.LeaderCommit > rf.commitIndex{
     rf.commitIndex = args.LeaderCommit
     if rf.commitIndex > rf.getLastLogIndex(){
       rf.commitIndex = rf.getLastLogIndex()
     }
-	  DPrintf("AppendEntries: commitIndex: raft %d's commitIndex now is %d\n", rf.me, rf.commitIndex)
     select{
     case rf.commitCh <- true:
     }
@@ -371,9 +366,11 @@ func (rf *Raft) sendHeartBeat(server int, args *AppendEntries, reply *AppendEntr
 	  if rf.state != LEADER || args.Term != rf.CurrentTerm{
 	    return ok
 	  }
+	  DPrintf("raft %d currentTerm %d, reply.Term %d\n", rf.me, rf.CurrentTerm, reply.Term)
 	  if rf.CurrentTerm < reply.Term{
 	    rf.mu.Lock()
 	    rf.state = FOLLOWER
+	    DPrintf("raft %d prev term is , cur term is %d, change to follower\n", rf.me, rf.CurrentTerm, reply.Term)
 	    rf.CurrentTerm = reply.Term
 	    rf.persist()
 	    rf.mu.Unlock()
@@ -424,7 +421,6 @@ func (rf *Raft) sendHeartBeatBroadcast(){
     rf.mu.Unlock()
       go func(server int, args *AppendEntries){
       var reply *AppendEntriesReply = &AppendEntriesReply{}
-      DPrintf("sendHeartBeatBroadcast:  raft %d send %d entries to raft %d\n", rf.me, len(args.Entries), server)
       rf.sendHeartBeat(server, args, reply)
     }(i, args)
   }
@@ -442,7 +438,6 @@ func (rf *Raft) sendHeartBeatBroadcast(){
 	      }
 	     }
 	     if rf.commitIndex != commitIndex && rf.Log[commitIndex].Term == rf.CurrentTerm{
-	       DPrintf("sendHeartBeatBroadcast: commitIndex: raft %d's commitIndex now is %d\n", rf.me, commitIndex)
 	       rf.commitIndex = commitIndex
 	       select{
 	       case rf.commitCh <- true:
@@ -563,6 +558,7 @@ func (rf *Raft) run(){
           case <-rf.electCh:
             rf.mu.Lock()
             rf.state = LEADER
+            DPrintf("raft %d  now is leaderi==========\n", rf.me)
             rf.nextIndex = make([]int, len(rf.peers))
             for i := 0; i < len(rf.peers); i++{
               rf.nextIndex[i] = rf.getLastLogIndex() + 1
