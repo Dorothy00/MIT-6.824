@@ -3,14 +3,15 @@ package raftkv
 import "labrpc"
 import "crypto/rand"
 import "math/big"
-import "sync/atomic"
+import "sync"
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
 	leader int
 	client int64
-	id     int64
+	id     int
+	mu     sync.Mutex
 }
 
 func nrand() int64 {
@@ -44,24 +45,23 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 func (ck *Clerk) Get(key string) string {
 
 	// You will have to modify this function.
-	DPrintf("Client: Start Get.....\n")
   var args *GetArgs = &GetArgs{}
+  ck.mu.Lock()
   args.Client = ck.client
-  args.Id = atomic.AddInt64(&ck.id, 1)
+  args.Id = ck.id
+  ck.id++
+  ck.mu.Unlock()
 	args.Key = key
 for{
 	  var reply *GetReply = &GetReply{}
 	  ok := ck.servers[ck.leader].Call("KVServer.Get", args, reply)
 	  if ok && !reply.WrongLeader {
 	    if reply.Err == OK {
-//	      DPrintf("Client: leader=%d, Get  %s=%s\n", ck.leader, key, reply.Value)
 	      return reply.Value
 	    }else {
-	      DPrintf("Client: Get nothing\n")
 	      return ""
 	    }
 	  }else{
-	//    DPrintf("Client: Get wrongleader %d, %t, %t\n", ck.leader, ok, reply.WrongLeader)
 	    ck.leader = (ck.leader + 1) % len(ck.servers)
 	  }
 	}
@@ -80,21 +80,21 @@ for{
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
-	DPrintf("Client: Start PutAppend.....\n")
 	var args * PutAppendArgs = &PutAppendArgs{}
+	ck.mu.Lock()
   args.Client = ck.client
-  args.Id = atomic.AddInt64(&ck.id, 1)
+  args.Id = ck.id
+  ck.id++
 	args.Key = key
 	args.Value = value
 	args.Op = op
+	ck.mu.Unlock()
 	for{
 	  var reply *PutAppendReply = &PutAppendReply{}
 	  ok := ck.servers[ck.leader].Call("KVServer.PutAppend", args, reply)
 	  if ok && !reply.WrongLeader{
-	  //  DPrintf("Client: leader=%d, Put %s = %s\n", ck.leader, key, value)
 	    break
 	  }else {
-	    //DPrintf("Client: Put wrongleader %d, %t, %t\n", ck.leader, ok, reply.WrongLeader)
 	    ck.leader = (ck.leader + 1) % len(ck.servers)
 	  }
 	}

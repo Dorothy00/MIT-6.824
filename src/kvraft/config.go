@@ -283,6 +283,7 @@ func (cfg *config) ShutdownServer(i int) {
 	}
 }
 
+
 // If restart servers, first call ShutdownServer
 func (cfg *config) StartServer(i int) {
 	cfg.mu.Lock()
