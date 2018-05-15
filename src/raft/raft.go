@@ -611,6 +611,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
 	isLeader := (rf.state == LEADER)
+	DPrintf("raft %d receive operate, is leader %t\n", rf.me, rf.state == LEADER)
 
 	// Your code here (2B).
 	if rf.state == LEADER{
@@ -705,6 +706,7 @@ func (rf *Raft) run(){
           case <-rf.electCh:
             rf.mu.Lock()
             rf.state = LEADER
+            DPrintf("raft %d become leader!\n", rf.me)
             rf.nextIndex = make([]int, len(rf.peers))
             rf.matchIndex = make([]int, len(rf.peers))
             for i := 0; i < len(rf.peers); i++{
@@ -747,7 +749,7 @@ func (rf *Raft) commitLogs(){
         for i := rf.lastApplied + 1; i <= rf.commitIndex; i++{
           msg := ApplyMsg{Index: i, Command: rf.Log[i - firstIndex].Command}
           select{
-          case rf.applyCh <- msg:
+            case rf.applyCh <- msg:
           }
           rf.lastApplied = i
         }

@@ -89,10 +89,14 @@ func TestBasic(t *testing.T) {
 	cfa := make([]Config, 6)
 	cfa[0] = ck.Query(-1)
 
+  fmt.Printf("check start...\n")
 	check(t, []int{}, ck)
+  fmt.Printf("check end...\n")
 
 	var gid1 int = 1
+	fmt.Printf("join %d start\n", gid1)
 	ck.Join(map[int][]string{gid1: []string{"x", "y", "z"}})
+	fmt.Printf("join %d finished\n", gid1)
 	check(t, []int{gid1}, ck)
 	cfa[1] = ck.Query(-1)
 
@@ -146,6 +150,7 @@ func TestBasic(t *testing.T) {
 		var gid4 int = 504
 		ck.Join(map[int][]string{gid4: []string{"4a", "4b", "4c"}})
 		for i := 0; i < NShards; i++ {
+		  fmt.Printf("test: move %d\n", i)
 			cf := ck.Query(-1)
 			if i < NShards/2 {
 				ck.Move(i, gid3)
