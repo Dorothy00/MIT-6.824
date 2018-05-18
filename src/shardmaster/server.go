@@ -47,7 +47,6 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
 	if !isLeader {
 	  reply.WrongLeader = true
 	}
-	DPrintf("sm %d join, op index is %d ,is Leader %t\n", sm.me, index, isLeader)
  ch, ok := sm.pendingOps[index]
  if !ok {
   ch = make(chan Op)
@@ -55,7 +54,6 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
  }
  select {
   case msg := <- ch:
-    DPrintf("sm %d receive Join result, \n", sm.me)
     if recArgs, ok := msg.Args.(JoinArgs); !ok {
       reply.WrongLeader = true
     }else {
@@ -124,8 +122,8 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
 	op.Kind = QUERY
 	op.Args = *args
 	index, _, isLeader := sm.rf.Start(op)
-	DPrintf("sm %d query , op index is %d ,is Leader %t\n", sm.me, index, isLeader)
 	if !isLeader {
+	  //DPrintf("sm %d: query wrongleader\n", sm.me)
 	  reply.WrongLeader = true
 	}
  ch, ok := sm.pendingOps[index]
@@ -135,23 +133,18 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
  }
  select {
   case msg := <- ch:
-    DPrintf("sm %d receive query result, \n", sm.me)
     reply.WrongLeader = true
     recArgs, ok := msg.Args.(QueryArgs)
-    DPrintf("sm %d, args client=%d requestId=%d, recv client=%d requestId=%d\n", sm.me, args.Client, args.RequestId, recArgs.Client, recArgs.RequestId)
     if ok && (args.Client == recArgs.Client && args.RequestId == recArgs.RequestId) {
       r, ok := msg.Reply.(QueryReply)
-      DPrintf("sm %d. ok=%t\n", sm.me, ok)
       if ok {
         reply.WrongLeader = false
         reply.Config = r.Config
       }
     }
   case <- time.After(1000 * time.Millisecond):
-    DPrintf("sm %d query timeout..\n", sm.me)
     reply.WrongLeader = true
  }
- DPrintf("sm %d, wrongLeader=%t\n", sm.me, reply.WrongLeader)
 }
 
 
@@ -211,7 +204,6 @@ func (sm *ShardMaster) Run() {
   for {
     select {
       case msg := <- sm.applyCh:
-        DPrintf("sm %d receve applyCh index %d from raft\n", sm.me, msg.Index)
           op := msg.Command.(Op)
           sm.Apply(op, msg.Index)
       case <- sm.kill:
@@ -242,12 +234,10 @@ func (sm *ShardMaster) nextConfig() *Config {
 }
 
 func (sm *ShardMaster) Apply(op Op, index int) {
-  DPrintf("sm %d apply index %d, type %T\n", sm.me, index, op.Args)
   sm.mu.Lock()
   defer sm.mu.Unlock()
   switch op.Args.(type) {
     case JoinArgs:
-      DPrintf("sm %d join apply, index %d\n", sm.me, index)
       args := op.Args.(JoinArgs)
       if !sm.IsDup(args.Client, args.RequestId) {
         sm.JoinApply(&args)
@@ -257,7 +247,6 @@ func (sm *ShardMaster) Apply(op Op, index int) {
         }
       }
     case LeaveArgs:
-      DPrintf("sm %d leave apply, index %d\n", sm.me, index)
       args := op.Args.(LeaveArgs)
       if !sm.IsDup(args.Client, args.RequestId) {
         sm.LeaveApply(&args)
@@ -267,7 +256,6 @@ func (sm *ShardMaster) Apply(op Op, index int) {
         }
       }
     case MoveArgs:
-      DPrintf("sm %d move apply, index %d\n", sm.me, index)
       args  := op.Args.(MoveArgs)
       if !sm.IsDup(args.Client, args.RequestId) {
         sm.MoveApply(&args)
@@ -277,22 +265,13 @@ func (sm *ShardMaster) Apply(op Op, index int) {
         }
       }
     case QueryArgs:
-      DPrintf("sm %d query apply, index %d\n", sm.me, index)
       args  := op.Args.(QueryArgs)
       if !sm.IsDup(args.Client, args.RequestId) {
         var reply QueryReply
         if args.Num == -1 || args.Num > sm.cfgNum {
-          DPrintf("sm %d: query reply cfgNum %d, confgNum %d\n", sm.me, sm.cfgNum, len(sm.configs))
           reply.Config = sm.configs[sm.cfgNum]
-        for k, v := range sm.configs[sm.cfgNum].Shards {
-          DPrintf("sm %d: query reply %d=%d-------\n", sm.me, k, v)
-        }
         }else {
-          DPrintf("sm %d: query reply cfgNum %d, confgNum %d-----------\n", sm.me, sm.cfgNum, len(sm.configs))
           reply.Config = sm.configs[args.Num]
-        }
-        for k, v := range reply.Config.Shards {
-          DPrintf("sm %d: query reply %d=%d\n", sm.me, k, v)
         }
         op.Reply = reply
         ch , ok := sm.pendingOps[index]
@@ -305,19 +284,12 @@ func (sm *ShardMaster) Apply(op Op, index int) {
 
 func (sm *ShardMaster) JoinApply(args *JoinArgs) {
   config := sm.nextConfig()
-  for s, g := range config.Shards {
-    DPrintf("sm %d shards, %d->%d\n", sm.me, s, g)
-  }
   for k, v := range args.Servers {
     if _, ok := config.Groups[k]; !ok {
       config.Groups[k] = v
       sm.ReBalance(config, JOIN, k)
     }
   }
-  for s, g := range sm.configs[sm.cfgNum].Shards {
-    DPrintf("sm %d after join shards, %d->%d\n", sm.me, s, g)
-  }
-
 }
 func (sm *ShardMaster) LeaveApply(args *LeaveArgs) {
   config := sm.nextConfig()
@@ -387,8 +359,5 @@ func (sm *ShardMaster) ReBalance(cfg *Config, Kind int, gid int) {
         cfg.Shards[v] = minGid
         shardsCount[minGid] = append(shardsCount[minGid], v)
       }
-  }
-  for k, v := range sm.configs[sm.cfgNum].Shards {
-    DPrintf("sm %d, after rebalance %d->%d\n", sm.me, k, v)
   }
 }

@@ -43,21 +43,13 @@ func (ck *Clerk) Query(num int) Config {
 	args.Num = num
 	args.Client = ck.client
 	args.RequestId = ck.id
-	DPrintf("Client start query.......\n" )
 	for {
 		// try each known server.
 		for i, srv := range ck.servers {
 			var reply QueryReply
 			ok := srv.Call("ShardMaster.Query", args, &reply)
-			DPrintf("client: ok=%t, wrongLeader=%t\n", ok, reply.WrongLeader)
 			if ok && reply.WrongLeader == false {
-	      for k, v := range reply.Config.Shards {
-	        DPrintf("Client: %d->%d\n", k, v)
-	      }
-	      DPrintf("Client end query........\n" )
 				return reply.Config
-			}else {
-		    DPrintf("Client query wrongleader %d ..\n", i)
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -73,7 +65,6 @@ func (ck *Clerk) Join(servers map[int][]string) {
 	args.Servers = servers
 	args.Client = ck.client
 	args.RequestId = ck.id
-	DPrintf("Client start Join...\n" )
 
 	for {
 		// try each known server.
@@ -81,7 +72,6 @@ func (ck *Clerk) Join(servers map[int][]string) {
 			var reply JoinReply
 			ok := srv.Call("ShardMaster.Join", args, &reply)
 			if ok && reply.WrongLeader == false {
-	      DPrintf("Client Finish Join...\n")
 				return
 			}
 		}
