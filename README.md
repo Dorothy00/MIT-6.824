@@ -134,6 +134,7 @@ PASS
 其中lab2的raft实现有点小bug，导致有两个测试用例通不过，lab3有一个测试用例通不过，lab4b不打算做了。
 
 实验参考代码链接如下：
+
 [1]https://github.com/ZiyueHuang/Distributed-Systems
 
 [2]https://github.com/Wiesen/MIT-6.824
